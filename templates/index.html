@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Webhook Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .status-indicator {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #27ae60;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .last-update {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .refresh-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-btn:hover {
+            background: #0056b3;
+            transform: translateY(-2px);
+        }
+
+        .events-container {
+            padding: 30px;
+            min-height: 400px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #6c757d;
+            font-size: 1.1em;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f4;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .event-item {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .event-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .event-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+        }
+
+        .event-item.push::before {
+            background: #28a745;
+        }
+
+        .event-item.pull-request::before {
+            background: #ffc107;
+        }
+
+        .event-item.merge::before {
+            background: #dc3545;
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .event-type {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .event-type.push {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .event-type.pull-request {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .event-type.merge {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .event-id {
+            color: #6c757d;
+            font-size: 0.8em;
+            font-family: 'Courier New', monospace;
+        }
+
+        .event-description {
+            font-size: 1.1em;
+            line-height: 1.5;
+            color: #2c3e50;
+        }
+
+        .event-author {
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .event-branches {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .branch-tag {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            color: #495057;
+            font-family: 'Courier New', monospace;
+        }
+
+        .no-events {
+            text-align: center;
+            padding: 50px;
+            color: #6c757d;
+        }
+
+        .no-events h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.9em;
+            border-top: 1px solid #dee2e6;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .event-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span>Live</span>
+            </div>
+            <h1>
+                🚀 GitHub Webhook Dashboard
+            </h1>
+            <p>Real-time monitoring of repository activities</p>
+        </div>
+
+        <div class="controls">
+            <div class="last-update">
+                Last updated: <span id="lastUpdate">Never</span>
+            </div>
+            <button class="refresh-btn" onclick="fetchData()">
+                🔄 Refresh Now
+            </button>
+        </div>
+
+        <div class="events-container">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div>Loading webhook events...</div>
+            </div>
+            <div id="eventsContainer" style="display: none;"></div>
+        </div>
+
+        <div class="footer">
+            <p>🔄 Auto-refreshing every 15 seconds | Built with Flask & MongoDB | 💻 TechStax Assignment</p>
+        </div>
+    </div>
+
+    <script>
+        let lastFetchTime = null;
+        let autoRefreshInterval = null;
+
+        function formatEventDescription(event) {
+            const { author, action, from_branch, to_branch, timestamp } = event;
+            
+            switch (action) {
+                case 'PUSH':
+                    return `<span class="event-author">${author}</span> pushed to <strong>${to_branch}</strong> on ${timestamp}`;
+                case 'PULL_REQUEST':
+                    return `<span class="event-author">${author}</span> submitted a pull request from <strong>${from_branch}</strong> to <strong>${to_branch}</strong> on ${timestamp}`;
+                case 'MERGE':
+                    return `<span class="event-author">${author}</span> merged branch <strong>${from_branch}</strong> to <strong>${to_branch}</strong> on ${timestamp}`;
+                default:
+                    return `<span class="event-author">${author}</span> performed ${action} on ${timestamp}`;
+            }
+        }
+
+        function createEventElement(event) {
+            const eventDiv = document.createElement('div');
+            eventDiv.className = `event-item ${event.action.toLowerCase().replace('_', '-')}`;
+            
+            eventDiv.innerHTML = `
+                <div class="event-header">
+                    <span class="event-type ${event.action.toLowerCase().replace('_', '-')}">${event.action}</span>
+                    <span class="event-id">ID: ${event.request_id.substring(0, 8)}...</span>
+                </div>
+                <div class="event-description">
+                    ${formatEventDescription(event)}
+                </div>
+                ${event.action !== 'PUSH' ? `
+                <div class="event-branches">
+                    <span class="branch-tag">📤 ${event.from_branch}</span>
+                    <span style="color: #6c757d;">→</span>
+                    <span class="branch-tag">📥 ${event.to_branch}</span>
+                </div>
+                ` : `
+                <div class="event-branches">
+                    <span class="branch-tag">🌿 ${event.to_branch}</span>
+                </div>
+                `}
+            `;
+            
+            return eventDiv;
+        }
+
+        async function fetchData() {
+            try {
+                console.log('🔄 Fetching latest webhook events...');
+                
+                const response = await fetch('/data');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const events = await response.json();
+                console.log(`✅ Fetched ${events.length} events`);
+                
+                const eventsContainer = document.getElementById('eventsContainer');
+                const loadingDiv = document.getElementById('loading');
+                
+                // Hide loading, show events container
+                loadingDiv.style.display = 'none';
+                eventsContainer.style.display = 'block';
+                
+                // Clear existing events
+                eventsContainer.innerHTML = '';
+                
+                if (events.length === 0) {
+                    eventsContainer.innerHTML = `
+                        <div class="no-events">
+                            <h3>🔍 No Events Yet</h3>
+                            <p>Waiting for webhook events from your GitHub repositories...</p>
+                            <p>Push some commits or create pull requests in your action-repo to see them here!</p>
+                        </div>
+                    `;
+                } else {
+                    events.forEach(event => {
+                        const eventElement = createEventElement(event);
+                        eventsContainer.appendChild(eventElement);
+                    });
+                }
+                
+                // Update last fetch time
+                lastFetchTime = new Date();
+                document.getElementById('lastUpdate').textContent = lastFetchTime.toLocaleTimeString();
+                
+            } catch (error) {
+                console.error('❌ Error fetching data:', error);
+                const eventsContainer = document.getElementById('eventsContainer');
+                const loadingDiv = document.getElementById('loading');
+                
+                loadingDiv.style.display = 'none';
+                eventsContainer.style.display = 'block';
+                eventsContainer.innerHTML = `
+                    <div class="no-events">
+                        <h3>⚠️ Connection Error</h3>
+                        <p>Unable to fetch webhook events. Please check your connection and try again.</p>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function startAutoRefresh() {
+            // Clear any existing interval
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+            
+            // Set up auto-refresh every 15 seconds
+            autoRefreshInterval = setInterval(() => {
+                console.log('🔄 Auto-refreshing...');
+                fetchData();
+            }, 15000); // 15 seconds
+            
+            console.log('✅ Auto-refresh started (15 seconds interval)');
+        }
+
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 GitHub Webhook Dashboard loaded');
+            
+            // Initial data fetch
+            fetchData();
+            
+            // Start auto-refresh
+            startAutoRefresh();
+            
+            // Add keyboard shortcut for manual refresh (F5 or Ctrl+R)
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
+                    e.preventDefault();
+                    fetchData();
+                }
+            });
+        });
+
+        // Handle page visibility change (pause auto-refresh when tab is not visible)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                console.log('⏸️ Page hidden, pausing auto-refresh');
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                }
+            } else {
+                console.log('▶️ Page visible, resuming auto-refresh');
+                fetchData();
+                startAutoRefresh();
+            }
+        });
+    </script>
+</body>
+</html>
