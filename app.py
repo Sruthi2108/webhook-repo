@@ -21,7 +21,9 @@ WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', '')
 
 # Initialize MongoDB connection
 try:
-    client = pymongo.MongoClient(MONGO_URI)
+    client = pymongo.MongoClient("mongodb+srv://sruthig509:qJgNHHIpHRBnjnMW@cluster0.b1hezbs.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+    events = list(client.github_webhooks.webhook_events.find())
+    print(events)
     db = client[DATABASE_NAME]
     collection = db[COLLECTION_NAME]
     print("✅ Connected to MongoDB successfully!")
@@ -63,24 +65,28 @@ def format_timestamp(iso_timestamp):
         return iso_timestamp
 
 def process_push_event(payload):
-    """Process GitHub push event"""
     try:
+        if 'head_commit' not in payload or not payload['head_commit']:
+            print("⚠️ No head_commit found.")
+            return None
         commit_hash = payload['head_commit']['id']
         author = payload['pusher']['name']
-        to_branch = payload['ref'].split('/')[-1]  # Extract branch name from refs/heads/branch-name
+        to_branch = payload['ref'].split('/')[-1]
         timestamp = format_timestamp(payload['head_commit']['timestamp'])
-        
-        return {
+        data = {
             'request_id': commit_hash,
             'author': author,
             'action': 'PUSH',
-            'from_branch': to_branch,  # For push, from and to are the same
+            'from_branch': to_branch,
             'to_branch': to_branch,
             'timestamp': timestamp
         }
+        print("✅ Processed push event:", json.dumps(data, indent=2))
+        return data
     except Exception as e:
-        print(f"Error processing push event: {e}")
+        print(f"❌ Error processing push event: {e}")
         return None
+
 
 def process_pull_request_event(payload):
     """Process GitHub pull request event (including merges)"""
@@ -122,9 +128,10 @@ def webhook():
     try:
         # Get payload and headers
         payload = request.get_json()
+        print("📦 Raw Payload:", json.dumps(payload, indent=2))
         signature = request.headers.get('X-Hub-Signature-256')
         event_type = request.headers.get('X-GitHub-Event')
-        
+        print(f"📨 Received {event_type} event")
         # Verify signature for security (optional)
         if not verify_signature(request.data, signature):
             return jsonify({'error': 'Invalid signature'}), 401
@@ -189,6 +196,21 @@ def health_check():
             'error': str(e),
             'timestamp': datetime.utcnow().isoformat()
         }), 500
+@app.route('/debug-insert')
+def debug_insert():
+    if collection:
+        event = {
+            "request_id": "test123",
+            "author": "TestUser",
+            "action": "PUSH",
+            "from_branch": "main",
+            "to_branch": "main",
+            "timestamp": "14th July 2025 - 5:30 PM UTC"
+        }
+        collection.insert_one(event)
+        return "Inserted test event!"
+    return "No DB connection."
+import json
 
 if __name__ == '__main__':
     print("🚀 Starting GitHub Webhook Flask App...")
